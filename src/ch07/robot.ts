@@ -25,6 +25,8 @@ let roadGraph = buildGraph(roads);
 // console.log(roadGraph);
 
 class VillageState {
+  place: string;
+  parcels: {place: string, address: string}[];
   constructor(place, parcels) {
     this.place = place;
     this.parcels = parcels;
@@ -134,10 +136,55 @@ function goalOrientedRobot({place, parcels}, memory) {
   return {direction: memory[0], memory: memory.slice(1)};
 }
 
-// runRobot(VillageState.random(), goalOrientedRobot, []);
+function deliverClosestNextRobot({place, parcels}, memory) {
+  if (memory.length == 0) {
+    let next = parcels.map(({place: p_place, address: p_address}) => ({address: p_address, route: findRoute(roadGraph, place, p_place)}))
+                             .reduce((A, B) => A.route.length <= B.route.length ? A : B);
+    memory = [...next.route, ...findRoute(roadGraph, place, next.address)];
+  }
+
+  return {direction: memory[0], memory: memory.slice(1)};
+}
+
+function pickUpClosestNext({place, parcels}, memory) {
+  if (memory.length == 0) {
+    let open_parcels = parcels.filter(p => p.place != place);
+    if (open_parcels.length > 0) {
+      memory = open_parcels.map(p => findRoute(roadGraph, place, p.place))
+                           .reduce((A, B) => A.length <= B.length ? A : B);
+    } else {
+      memory = parcels.map(p => findRoute(roadGraph, place, p.address))
+                      .reduce((A, B) => A.length <= B.length ? A : B);
+    }
+  }
+
+  return {direction: memory[0], memory: memory.slice(1)};
+}
+
+function closestRouteNext({place, parcels}, memory) {
+  enum Mode {
+    PICK_UP,
+    DELIVER,
+  };
+  if (memory.length == 0) {
+    memory = parcels.map(p => {
+      if (p.place == place) return {mode: Mode.DELIVER, route: findRoute(roadGraph, place, p.address)};
+      else return {mode: Mode.PICK_UP, route: findRoute(roadGraph, place, p.place)};
+    })
+    .reduce((A,B) => {
+      if (A.route.length < B.route.length) return A;
+      else if (A.route.length == B.route.length && A.mode == Mode.PICK_UP) return A;
+      else return B;
+    }).route;
+  }
+
+  return {direction: memory[0], memory: memory.slice(1)};
+}
+
+runRobot(VillageState.random(), pickUpClosestNext, []);
 
 function compareRobots(robotA, memoryA, robotB, memoryB) {
-  const runCount = 100;
+  const runCount = 1000;
   let turnSumA = 0;
   let turnSumB = 0;
   for (let i = 0; i < runCount; i++) {
@@ -149,3 +196,5 @@ function compareRobots(robotA, memoryA, robotB, memoryB) {
 }
 
 compareRobots(routeRobot, [], goalOrientedRobot, []);
+compareRobots(goalOrientedRobot, [], pickUpClosestNext, []);
+compareRobots(pickUpClosestNext, [], closestRouteNext, []);
