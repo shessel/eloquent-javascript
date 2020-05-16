@@ -106,6 +106,21 @@ specialForms.if = function(args, scope) {
   else return evaluateExpression(args[2], scope);
 };
 
+specialForms.set = function(args, scope) {
+  if (args.length != 2) throw new Error("Wrong number of arguments for set");
+  if (args[0].type == "word") {
+    let name = args[0].value;
+    for (let curScope = scope; curScope; curScope = Object.getPrototypeOf(curScope)) {
+      if (Object.prototype.hasOwnProperty.call(curScope, name)) {
+        let value = evaluateExpression(args[1], scope)
+        curScope[name] = value;
+        return value;
+      }
+    }
+    throw new ReferenceError(`No binding found for '${name}'`);
+  }
+};
+
 specialForms.while = function(args, scope) {
   if (args.length != 2) throw new Error("Wrong number of arguments for while");
   while (evaluateExpression(args[0], scope)) {
@@ -209,3 +224,14 @@ console.log(parse("a # one\n   # two\n()"));
 // → {type: "apply",
 //    operator: {type: "word", name: "a"},
 //    args: []}
+
+run(`
+do(define(x, 4),
+   define(setx, fun(val, set(x, val))),
+   setx(50),
+   print(x))
+`);
+// → 50
+
+run(`set(quux, true)`);
+// → Some kind of ReferenceError
