@@ -66,9 +66,11 @@ function parse(program) {
 specialForms = Object.create(null);
 
 specialForms.do = function(args, scope) {
+  let value = false;
   for (let arg of args) {
-    evaluateExpression(arg, scope);
+    value = evaluateExpression(arg, scope);
   }
+  return value;
 };
 
 specialForms.define = function(args, scope) {
@@ -131,14 +133,24 @@ function evaluateExpression(expr, scope) {
   }
 }
 
-let rootScope = Object.create(null);
+const rootScope = Object.create(null);
 for (let op of ["+", "-", "*", "%", "<", "<=", ">", ">+", "==", "!=",]) {
   rootScope[op] = new Function("a, b", `return a ${op} b`);
 }
 rootScope.print = console.log;
 rootScope.false = false;
 rootScope.true = true;
-
+rootScope.array = function(...values) {
+  return values;
+};
+rootScope.length = function(arg) {
+  if (!Array.isArray(arg)) throw TypeError("Argument to length must have type array");
+  return arg.length;
+};
+rootScope.element = function(arg, index) {
+  if (!Array.isArray(arg)) throw TypeError("Argument to element must have type array");
+  return arg[index];
+};
 function run(program) {
   return evaluateExpression(parse(program), Object.create(rootScope));
 }
@@ -177,3 +189,15 @@ do(define(pow, fun(base, exp,
    print(pow(2, 10)))
 `);
 // → 1024
+
+run(`
+do(define(sum, fun(array,
+     do(define(i, 0),
+        define(sum, 0),
+        while(<(i, length(array)),
+          do(define(sum, +(sum, element(array, i))),
+             define(i, +(i, 1)))),
+        sum))),
+   print(sum(array(1, 2, 3))))
+`);
+// → 6
