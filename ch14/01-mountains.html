@@ -1,0 +1,52 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+  </head>
+  <body>
+    <h1>Mountains</h1>
+
+    <div id="mountains"></div>
+
+    <script>
+      const MOUNTAINS = [
+        {name: "Kilimanjaro", height: 5895, place: "Tanzania"},
+        {name: "Everest", height: 8848, place: "Nepal"},
+        {name: "Mount Fuji", height: 3776, place: "Japan"},
+        {name: "Vaalserberg", height: 323, place: "Netherlands"},
+        {name: "Denali", height: 6168, place: "United States"},
+        {name: "Popocatepetl", height: 5465, place: "Mexico"},
+        {name: "Mont Blanc", height: 4808, place: "Italy/France"}
+      ];
+
+      let categories = Object.keys(MOUNTAINS[0]);
+      let table = document.createElement("table");
+
+      function addTableCell(row, type, content) {
+        let cell = document.createElement(type);
+        cell.appendChild(document.createTextNode(content));
+        if (type == "td" && typeof content == "number") {
+          cell.style.textAlign = "right";
+        }
+        row.appendChild(cell);
+      }
+
+      function addTableHeader(table, categories) {
+        let row = document.createElement("tr");  
+        categories.forEach(category => addTableCell(row, "th", category));
+        table.appendChild(row);
+      }
+
+      function addTableRow(table, categories, obj) {
+        let row = document.createElement("tr");  
+        categories.forEach(category => addTableCell(row, "td", obj[category]));
+        table.appendChild(row);
+      }
+
+      addTableHeader(table, categories);
+      MOUNTAINS.forEach(mountain => addTableRow(table, categories, mountain));
+      
+      document.getElementById("mountains").appendChild(table);
+    </script>
+  </body>
+</html>
