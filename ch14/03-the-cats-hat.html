@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+  </head>
+  <body>
+    <style>body { min-height: 200px }</style>
+    <img src="https://eloquentjavascript.net/img/cat.png" id="cat" style="position: absolute">
+    <img src="https://eloquentjavascript.net/img/hat.png" id="hat" style="position: absolute">
+
+    <script>
+      let cat = document.querySelector("#cat");
+      let hat = document.querySelector("#hat");
+
+      let angle = 0;
+      let lastTime = null;
+      function animate(time) {
+        if (lastTime != null) angle += (time - lastTime) * 0.001;
+        lastTime = time;
+        let catTop = (Math.sin(angle) * 40 + 40);
+        let catLeft = (Math.cos(angle) * 200 + 230);
+        cat.style.top = catTop + "px";
+        cat.style.left = catLeft + "px";
+
+        let hatTop = catTop - (Math.sin(angle*4)) * 30 - 30;
+        let hatLeft = catLeft - (Math.cos(angle*4)) * 30 - 30 + 35;
+        hat.style.top = hatTop + "px";
+        hat.style.left = hatLeft + "px";
+
+        requestAnimationFrame(animate);
+      }
+      requestAnimationFrame(animate);
+    </script>
+  </body>
+</html>
