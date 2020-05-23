@@ -1,0 +1,31 @@
+.actor {
+  position: absolute;
+}
+.game {
+  overflow: hidden;
+  max-width: 600px;
+  max-height: 450px;
+  position: relative;
+}
+.background {
+  background-color: royalblue;
+  table-layout: fixed;
+  border-spacing: 0;  
+}
+.background td {
+  padding: 0;
+  width: 20px;
+  height: 20px;
+}
+.wall {
+  background-color: darkgray;
+}
+.lava {
+  background-color: crimson;
+}
+.player {
+  background-color: gray;
+}
+.coin {
+  background-color: gold;
+}
