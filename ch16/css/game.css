@@ -26,6 +26,12 @@
 .player {
   background-color: gray;
 }
+.lost .player {
+  background-color: darkred;
+}
+.won .player {
+  box-shadow: -4px -7px 8px white, 4px -7px 8px white;
+}
 .coin {
   background-color: gold;
 }

@@ -159,9 +159,9 @@ class State {
 
   update(dt, keyState) {
     let state = this.state;
-    let actors = this.actors;
+    let actors = this.actors.map(actor => actor.update(dt, this.level, keyState));
+      
     if (state == "playing") {
-      actors = actors.map(actor => actor.update(dt, this.level, keyState));
       let player = this.player;
       if (this.level.getTouchedMapTypes(player.pos, player.size).includes("lava")) {
         return new State(this.level, actors, "lost");
@@ -319,6 +319,7 @@ class DomRenderer {
     this.actorLayer = this.drawActors(state.actors);
     this.scrollToPlayer(state);
     this.container.appendChild(this.actorLayer);
+    this.container.className = `game ${state.state}`;
   }
 }
 
@@ -361,14 +362,18 @@ class Game {
     this.state = State.start(level);
     return new Promise(resolve => {
       let last;
+      let timeout = 1;
       let loop = time => {
         if (last) {
           let dt = 0.001 * (time - last);
           this.update(dt);
           if (this.state.state != "playing") {
-            this.renderer.clear();
-            resolve(this.state.state);
-            return;
+            if (timeout > 0) timeout -= dt;
+            else {
+              this.renderer.clear();
+              resolve(this.state.state);
+              return;
+            }
           }
         }
         last = time;
@@ -380,7 +385,9 @@ class Game {
 
   async run() {
     for (let level of this.levels) {
-      await this.runLevel(level);
+      for (let result; result != "won";) {
+        result = await this.runLevel(level);
+      }
     }
   }
 }
