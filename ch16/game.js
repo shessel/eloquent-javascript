@@ -264,7 +264,7 @@ class DomRenderer {
   drawBackground(level) {
     return createElement("table", {
         class: "background",
-        style: `width: ${level.width*DomRenderer.scale}px; height: ${level.heigh**DomRenderer.scale}px;`
+        style: `width: ${level.width*DomRenderer.scale}px; height: ${level.height*DomRenderer.scale}px;`
       }, ...level.map.map(row => {
       return createElement("tr", {}, ...row.map(cell =>{
         return createElement("td", {class: cell});
@@ -346,10 +346,11 @@ class InputHandler {
 }
 
 class Game {
-  constructor(levels, renderer) {
+  constructor(levels, renderer, maxLives = 3) {
     this.levels = levels.map(level => new Level(level));
     this.rendererType = renderer;
     this.inputHandler = new InputHandler();
+    this.maxLives = maxLives;
   }
 
   update(dt) {
@@ -384,10 +385,17 @@ class Game {
   }
 
   async run() {
+    let lives = this.maxLives;
     for (let level of this.levels) {
-      for (let result; result != "won";) {
+      for (let result; result != "won"; lives--) {
+        console.log(lives, "lives left");
         result = await this.runLevel(level);
+        if (lives == 0) {
+          console.log("Game over");
+          return;
+        }
       }
+      console.log("You won");
     }
   }
 }
