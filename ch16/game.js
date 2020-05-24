@@ -75,7 +75,7 @@ class Player {
     const cellSize = new Vector(1,1);
     let offset = Player.prototype.size.sub(cellSize).scaleVec(new Vector(0.5,1));
 
-    pos = pos.sub(offset.add(new Vector(0,0.01)));
+    pos = pos.sub(offset);
     return new Player(pos, new Vector(0,0));
   }
 }
@@ -324,24 +324,52 @@ class DomRenderer {
 }
 
 class InputHandler {
-  constructor() {
+  constructor(keys) {
     this.keyState = Object.create(null);
-    this.keyState["ArrowUp"] = false;
-    this.keyState["ArrowLeft"] = false;
-    this.keyState["ArrowRight"] = false;
+    this.resetKeyState(keys);
+    this.callbacks = [];
 
-    window.addEventListener("keydown", event => {
+    this.keyDown = event => {
       if (Object.keys(this.keyState).includes(event.code)) {
         this.keyState[event.code] = true;
         event.preventDefault();
       };
-    });
-    window.addEventListener("keyup", event => {
+    };
+
+    this.keyUp = event => {
       if (Object.keys(this.keyState).includes(event.code)) {
         this.keyState[event.code] = false;
         event.preventDefault();
       };
+    };
+  }
+
+  resetCallbacks() {
+    this.callbacks.forEach(cb => window.removeEventListener(cb.event, cb.callback));
+    this.callbacks = [];
+  }
+
+  addCallback(event, keyCode, callback) {
+    this.callbacks.push({event, callback});
+    window.addEventListener(event, event => {
+      if (event.code == keyCode) callback();
     });
+  }
+
+  resetKeyState(keys) {
+    if (!keys) keys = Object.keys(this.keyState);
+    keys.forEach(key => this.keyState[key] = false);
+  }
+
+  activate() {
+    window.addEventListener("keydown", this.keyDown);
+    window.addEventListener("keyup", this.keyUp);
+  }
+
+  deactivate() {
+    window.removeEventListener("keydown", this.keyDown);
+    window.removeEventListener("keyup", this.keyUp);
+    this.resetKeyState();
   }
 }
 
@@ -349,7 +377,8 @@ class Game {
   constructor(levels, renderer, maxLives = 3) {
     this.levels = levels.map(level => new Level(level));
     this.rendererType = renderer;
-    this.inputHandler = new InputHandler();
+    const keysToHandle = ["ArrowUp", "ArrowLeft","ArrowRight"];
+    this.inputHandler = new InputHandler(keysToHandle);
     this.maxLives = maxLives;
   }
 
@@ -364,14 +393,19 @@ class Game {
     return new Promise(resolve => {
       let last;
       let timeout = 1;
+      let paused = false;
+      this.inputHandler.addCallback("keydown", "Escape", () => {
+        paused = !paused;
+      });
       let loop = time => {
-        if (last) {
+        if (last && !paused) {
           let dt = 0.001 * (time - last);
           this.update(dt);
           if (this.state.state != "playing") {
             if (timeout > 0) timeout -= dt;
             else {
               this.renderer.clear();
+              this.inputHandler.resetCallbacks();
               resolve(this.state.state);
               return;
             }
@@ -386,16 +420,19 @@ class Game {
 
   async run() {
     let lives = this.maxLives;
+    this.inputHandler.activate();
+    gameLoop:
     for (let level of this.levels) {
       for (let result; result != "won"; lives--) {
         console.log(lives, "lives left");
         result = await this.runLevel(level);
         if (lives == 0) {
           console.log("Game over");
-          return;
+          break gameLoop;
         }
       }
       console.log("You won");
     }
+    this.inputHandler.deactivate();
   }
 }
