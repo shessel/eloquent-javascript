@@ -82,6 +82,56 @@ class Player {
 Player.prototype.size = new Vector(0.8, 1.5);
 Player.prototype.type = "player";
 
+class Monster {
+  constructor (pos, vel) {
+    this.pos = pos;
+    this.vel = vel;
+  }
+
+  update(dt, level) {
+    let pos = this.pos;
+    let vel = this.vel;
+    let newX = pos.add(vel.scaleScalar(dt));
+    if (!level.getTouchedMapTypes(newX, this.size).includes("wall")) {
+      pos = newX;
+    } else {
+      vel = vel.neg();
+    }
+    return new Monster(pos, vel);
+  }
+
+  collide(state) {
+    let actors = state.actors;
+    let status = state.status;
+
+    let player = state.player;
+    if (player.pos.y + player.size.y - this.pos.y < 0.5) {
+      actors = actors.filter(actor => actor != this);
+      actors = actors.map(actor => {
+        if (actor == player) {
+          return new Player(actor.pos, new Vector(actor.vel.x, Math.min(actor.vel.y, -10)));
+        } else {
+          return actor;
+        }
+      });
+    } else {
+      status = "lost";
+    }
+
+    return new State(state.level, actors, status);
+  }
+
+  static create(pos) {
+    const cellSize = new Vector(1,1);
+    let offset = Monster.prototype.size.sub(cellSize).scaleVec(new Vector(0.5,1));
+
+    pos = pos.sub(offset);
+    return new Monster(pos, new Vector(Math.random() < 0.5 ? 5 : -5,0));
+  }
+}
+Monster.prototype.size = new Vector(1.2, 2);
+Monster.prototype.type = "monster";
+
 class Lava {
   constructor (pos, vel, reset) {
     this.pos = pos;
@@ -101,6 +151,10 @@ class Lava {
       }
     }
     return new Lava(pos, vel, this.reset);
+  }
+
+  collide(state) {
+    return new State(state.level, state.actors, "lost");
   }
 
   static create(pos, char) {
@@ -130,6 +184,16 @@ class Coin {
     return new Coin(pos, this.basePos, phase);
   }
 
+  collide(state) {
+    let actors = state.actors;
+    let status = state.status;
+    actors = state.actors.filter(actor => actor != this);
+    if (actors.filter(actor => actor.type == "coin") == 0) {
+      status = "won";
+    }
+    return new State(state.level, actors, status);
+  }
+
   static create(pos) {
     const cellSize = new Vector(1,1);
     const offset = Coin.prototype.size.sub(cellSize).scaleVec(new Vector(0.5,0.5));
@@ -142,10 +206,10 @@ Coin.prototype.size = new Vector(0.6, 0.6);
 Coin.prototype.type = "coin";
 
 class State {
-  constructor(level, actors, state) {
+  constructor(level, actors, status) {
     this.level = level;
     this.actors = actors;
-    this.state = state;
+    this.status = status;
     this.coinCount = this.actors.filter(actor => actor.type == "coin").length;
   }
 
@@ -158,33 +222,23 @@ class State {
   }
 
   update(dt, keyState) {
-    let state = this.state;
+    let level = this.level;
+    let status = this.status;
     let actors = this.actors.map(actor => actor.update(dt, this.level, keyState));
-      
-    if (state == "playing") {
-      let player = this.player;
-      if (this.level.getTouchedMapTypes(player.pos, player.size).includes("lava")) {
-        return new State(this.level, actors, "lost");
-      }
-
-      actors.filter(actor => actor != player)
-        .forEach(actor => {
-          if (doActorsOverlap(player, actor)) {
-            if (actor.type == "coin") {
-              actor.active = false;
-              this.coinCount -= 1;
-              if (this.coinCount == 0) {
-                state = "won";
-              }
-            }
-            if (actor.type == "lava") {
-              state = "lost";
-            }
-          }
-        });
-      actors = actors.filter(actor => actor.type != "coin" || actor.active);
+    let newState = new State(level, actors, status);
+    if (status != "playing") {
+      return new State(this.level, actors, status);
     }
-    return new State(this.level, actors, state);
+
+    let player = newState.player;
+    if (level.getTouchedMapTypes(player.pos, player.size).includes("lava")) {
+      return new State(level, actors, "lost");
+    }
+    
+    actors.filter(actor => actor != player && doActorsOverlap(actor, player))
+      .forEach(actor => newState = actor.collide(newState));
+    
+    return newState;
   }
 }
 
@@ -234,7 +288,8 @@ Level.prototype.charsToType = {
   "+": "lava",
   "=": Lava,
   "|": Lava,
-  "v": Lava
+  "v": Lava,
+  "M": Monster,
 };
 
 function createElement(type, attributes, ...children) {
@@ -319,7 +374,7 @@ class DomRenderer {
     this.actorLayer = this.drawActors(state.actors);
     this.scrollToPlayer(state);
     this.container.appendChild(this.actorLayer);
-    this.container.className = `game ${state.state}`;
+    this.container.className = `game ${state.status}`;
   }
 }
 
@@ -401,12 +456,12 @@ class Game {
         if (last && !paused) {
           let dt = 0.001 * (time - last);
           this.update(dt);
-          if (this.state.state != "playing") {
+          if (this.state.status != "playing") {
             if (timeout > 0) timeout -= dt;
             else {
               this.renderer.clear();
               this.inputHandler.resetCallbacks();
-              resolve(this.state.state);
+              resolve(this.state.status);
               return;
             }
           }
