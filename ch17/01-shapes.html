@@ -1,0 +1,99 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+  </head>
+  <body>
+    <canvas width="600px" height="300px"></canvas>
+    <script>
+      let ctx = document.querySelector("canvas").getContext("2d");
+      function trapezoid(ctx, x, y, topWidth, bottomWidth, height) {
+        let widthDiff = topWidth - bottomWidth;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + topWidth, y);
+        ctx.lineTo(x + bottomWidth + widthDiff/2, y+height);
+        ctx.lineTo(x + widthDiff/2, y+height);
+        ctx.closePath();
+        ctx.stroke();
+      }
+
+      function redDiamond(ctx, x,y,r) {
+        ctx.save();
+        ctx.fillStyle = "red";
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + 2*r, y + r);
+        ctx.lineTo(x + r, y + 2*r);
+        ctx.lineTo(x, y + r);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function zigZag(ctx, x,y,w,h,segments) {
+        yStep = h / (segments - 1);
+        ctx.beginPath();
+        ctx.moveTo(x,y);
+        for (let i = 0; i < segments; i++) {
+          ctx.lineTo(i %2 == 0 ? x : x + w, y + i*yStep);
+        }
+        ctx.stroke();
+      }
+
+      function pointOnCircle({x, y}, radius, angle) {
+        return {
+          x: x + Math.cos(angle) * radius,
+          y: y + Math.sin(angle) * radius
+        }
+      }
+
+      function spiral(ctx, x,y,d,startAngle,revolutions,segments=100) {
+        let angleStep = Math.PI*2*revolutions/(segments - 1);
+        let radius = d/2;
+        let distStep = radius / (segments - 1);
+        let center = {x: x + radius, y: y + radius};
+
+        ctx.beginPath();
+
+        ctx.moveTo(center.x, center.y);
+        for (let i = 0; i < segments; i++) {
+          let angle = startAngle + i * angleStep;
+          let next = pointOnCircle(center, i * distStep, angle);
+          ctx.lineTo(next.x, next.y);
+        }
+        ctx.stroke();
+      }
+
+      function yellowStar(ctx,x,y,d,segments) {
+        ctx.save();
+
+        let radius = d/2;
+        let angleStart = Math.PI*3/2;
+        let angleStep = Math.PI*2/segments;
+
+        ctx.beginPath();
+
+        let center = {x: x + radius, y: y + radius};
+        let cur = pointOnCircle(center, radius, angleStart);
+        ctx.moveTo(cur.x, cur.y);
+        for (let i = 0; i < segments; i++) {
+          let next = pointOnCircle(center, radius, angleStart + (i+1) * angleStep);
+          ctx.quadraticCurveTo(center.x, center.y, next.x, next.y);
+          cur = next;
+        }
+
+        ctx.fillStyle = "yellow";
+        ctx.fill();
+        ctx.closePath();
+        ctx.restore();
+      }
+
+      trapezoid(ctx, 0, 100, 100, 50, 100);
+      redDiamond(ctx, 100, 100, 50);
+      zigZag(ctx, 200, 100, 100, 100, 12);
+      spiral(ctx, 300, 100, 100, Math.PI/2, 3);
+      yellowStar(ctx, 400, 100, 100, 7);
+    </script>
+  </body>
+</html>
