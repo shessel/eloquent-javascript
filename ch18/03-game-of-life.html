@@ -1,0 +1,52 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+  </head>
+  <body>
+    <script>
+      let container = document.createElement("div");
+
+      const WIDTH = 8;
+      const HEIGHT = 8;
+      let checkboxes = [];
+      for (let y = 0; y < HEIGHT; y++) {
+        for (let x = 0; x < WIDTH; x++) {
+          let checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          let checked = Math.random() < 0.5;
+          checkbox.checked = checked;
+          checkboxes.push(checkbox);
+          container.appendChild(checkbox);
+        }
+        container.appendChild(document.createElement("br"));
+      }
+
+      function step() {
+        let grid = checkboxes.map(cb => cb.checked);
+        grid = grid.map((_, i) => {
+          let cellx = i % WIDTH;
+          let celly = Math.floor(i / HEIGHT);
+
+          let alive = checkboxes[celly*WIDTH + cellx].checked;
+          let alive_neighbors = 0;
+          for (let y = Math.max(0, celly - 1); y < Math.min(celly + 2,HEIGHT); y++) {
+            for (let x = Math.max(0, cellx - 1); x < Math.min(cellx + 2, WIDTH); x++) {
+              if ((x != cellx || y != celly) && checkboxes[y*WIDTH + x].checked) alive_neighbors++;
+            }
+          }
+          return alive && alive_neighbors >=2 && alive_neighbors <= 3
+            || !alive && alive_neighbors == 3;
+        });
+        checkboxes.forEach((checkbox, i) => checkbox.checked = grid[i]);
+      }
+
+      let button = document.createElement("button");
+      button.textContent = "Step";
+      button.addEventListener("click", step);
+      container.appendChild(button);
+
+      document.body.appendChild(container);
+    </script>
+  </body>
+</html>
