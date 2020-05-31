@@ -1,0 +1,26 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+  </head>
+  <body>
+    <textarea id="code"></textarea>
+    <button id="run">Run</button>
+    <pre id="output"></pre>
+
+    <script>
+      let runButton = document.querySelector("#run");
+      let codeTextArea = document.querySelector("#code");
+      let output = document.querySelector("#output");
+      runButton.addEventListener("click", run);
+      function run() {
+        try {
+          let func = Function(codeTextArea.value);
+          output.textContent = func();
+        } catch (error) {
+          output.textContent = error.message;
+        }
+      }
+    </script>
+  </body>
+</html>
