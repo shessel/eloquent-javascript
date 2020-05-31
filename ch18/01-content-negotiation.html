@@ -1,0 +1,26 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+  </head>
+  <body>
+    <script>
+      function fetchEjsAuthor(type) {
+        fetch("https://eloquentjavascript.net/author", {
+          headers: {
+            Accept: type
+          }
+        }).then(response => {
+          console.log(response.status);
+          if (response.ok) {
+            response.text().then(console.log);
+          }
+        });
+      }
+      fetchEjsAuthor("text/html");
+      fetchEjsAuthor("text/plain");
+      fetchEjsAuthor("application/json");
+      fetchEjsAuthor("application/rainbows+unicorns");
+    </script>
+  </body>
+</html>
