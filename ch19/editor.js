@@ -36,8 +36,8 @@ class Picture {
     positions.push({ x: start.x, y: start.y });
 
     for (let i = 1; i <= steps; i++) {
-      let x = start.x + Math.floor(i * width / steps)
-      let y = start.y + Math.floor(i * height / steps)
+      let x = start.x + Math.round(i * width / steps)
+      let y = start.y + Math.round(i * height / steps)
       positions.push({ x, y });
     }
 
@@ -133,15 +133,15 @@ class PictureCanvas {
 }
 
 function draw(pos, state, dispatch) {
-  let params = [];
+  let undoParams = [];
+  let redoParams = [];
   let last = pos;
-  const originalUndoStack = state.undoStack;
+  const originalUndoStack = state.undoStack.slice(0, state.undoIndex + 1);
+  const originalRedoStack = state.redoStack.slice(0, state.undoIndex + 1);
   function draw(pos, state) {
-    // early out prevents pixels being saved as target color in undo stack
-    // when they are passed over multiple times
-    if (state.picture.pixel(pos) == state.color) return;
 
     let picture;
+    let pictureOp;
 
     // to get unbroken paths when drawing connect non-neighboring single pixels
     // by drawing a line between them
@@ -149,14 +149,23 @@ function draw(pos, state, dispatch) {
       let positions = [];
       picture = state.picture.drawLine(last, pos, state.color, positions);
       positions = positions.map(pos => ({ pos, color: state.picture.pixel(pos) })).filter(({ color }) => color != state.color);
-      params = [...params, ...positions];
+      undoParams = [...undoParams, ...positions];
+      redoParams = [...redoParams, ...positions.map(({ pos }) => ({ pos, color: state.color }))];
     } else {
+      // early out prevents pixels being saved as target color in undo stack
+      // when they are passed over multiple times
+      if (state.picture.pixel(pos) == state.color) return;
+
+      const params = [{ pos, color: state.color }];
+      picture = state.picture.draw(params);
       picture = state.picture.draw([{ pos, color: state.color }]);
-      params.push({ pos, color: state.picture.pixel(pos) })
+      undoParams.push({ pos, color: state.picture.pixel(pos) })
+      redoParams.push(...params);
     }
     dispatch({
       picture,
-      undoStack: [...originalUndoStack, { pictureOp: "draw", params: [params] }]
+      redoStack: [...originalRedoStack, { pictureOp: "draw", params: [redoParams] }],
+      undoStack: [...originalUndoStack, { pictureOp: "draw", params: [undoParams] }]
     });
     last = pos;
   }
@@ -172,7 +181,8 @@ function line(pos, state, dispatch) {
     positions = positions.map(pos => ({ pos, color: state.picture.pixel(pos) }));
     dispatch({
       picture,
-      undoStack: [...state.undoStack, { pictureOp: "draw", params: [positions] }]
+      redoStack: [...state.redoStack.slice(0, state.undoIndex + 1), { pictureOp: "drawLine", params: [start, pos, state.color] }],
+      undoStack: [...state.undoStack.slice(0, state.undoIndex + 1), { pictureOp: "draw", params: [positions] }]
     });
   }
   draw(start);
@@ -198,7 +208,8 @@ function rect(pos, state, dispatch) {
     }
     dispatch({
       picture: state.picture.fillRect(topLeft, bottomRight, state.color),
-      undoStack: [...state.undoStack, { pictureOp: "fillRectData", params: [topLeft, bottomRight, undoData] }]
+      redoStack: [...state.redoStack.slice(0, state.undoIndex + 1), { pictureOp: "fillRect", params: [topLeft, bottomRight, state.color] }],
+      undoStack: [...state.undoStack.slice(0, state.undoIndex + 1), { pictureOp: "fillRectData", params: [topLeft, bottomRight, undoData] }]
     });
   }
   drawRect(pos);
@@ -231,7 +242,8 @@ function fill(pos, state, dispatch) {
   }
   dispatch({
     picture: state.picture.fill(positions, state.color),
-    undoStack: [...state.undoStack, { pictureOp: "fill", params: [positions, colorToReplace] }]
+    redoStack: [...state.redoStack.slice(0, state.undoIndex + 1), { pictureOp: "fill", params: [positions, state.color] }],
+    undoStack: [...state.undoStack.slice(0, state.undoIndex + 1), { pictureOp: "fill", params: [positions, colorToReplace] }]
   });
 }
 
@@ -274,29 +286,52 @@ class ToolSelect {
 }
 
 class UndoButton {
-  constructor(state, { dispatch }) {
+  constructor(_state, { dispatch }) {
     this.dom = elt("button", {
       onclick: event => {
-        if (this.undoStack.length == 0) return;
-        const undoProp = this.undoStack[this.undoStack.length - 1]
+        if (this.undoStack.length == 0 || this.undoIndex < 0) return;
+        const undoProp = this.undoStack[this.undoIndex];
         dispatch({
           picture: this.picture[undoProp.pictureOp](...undoProp.params),
-          undoStack: this.undoStack.slice(0, this.undoStack.length - 1)
+          undoIndex: this.undoIndex - 1
         })
       }
     },
-      // ↷ Redo
       "↶ Undo");
   }
 
   syncState(state) {
+    this.undoIndex = state.undoIndex;
     this.undoStack = state.undoStack;
     this.picture = state.picture;
   }
 }
 
+class RedoButton {
+  constructor(_state, { dispatch }) {
+    this.dom = elt("button", {
+      onclick: () => {
+        const redoIndex = this.undoIndex + 1;
+        if (this.redoStack.length == 0 || redoIndex >= this.redoStack.length) return;
+        const redoProp = this.redoStack[redoIndex];
+        dispatch({
+          picture: this.picture[redoProp.pictureOp](...redoProp.params),
+          undoIndex: this.undoIndex + 1
+        })
+      }
+    },
+      "↷ Redo");
+  }
+
+  syncState(state) {
+    this.undoIndex = state.undoIndex;
+    this.redoStack = state.redoStack;
+    this.picture = state.picture;
+  }
+}
+
 class SaveButton {
-  constructor(state, { dispatch }) {
+  constructor() {
     this.dom = elt("button",
       {
         onclick: event => {
@@ -324,7 +359,10 @@ const baseTools = {
 const baseState = {
   tool: "draw",
   color: "#ff0000",
+  redoStack: [],
+  redoIndex: -1,
   undoStack: [],
+  undoIndex: -1,
   picture: Picture.empty(32, 32, "#f0f0f0")
 };
 
@@ -332,6 +370,7 @@ const baseControls = [
   ToolSelect,
   ColorSelect,
   UndoButton,
+  RedoButton,
   SaveButton
 ];
 
@@ -340,6 +379,7 @@ const baseConfig = { controls: baseControls, tools: baseTools };
 class PixelEditor {
   constructor(state = baseState, { controls, tools } = baseConfig) {
     let dispatch = (props) => {
+      if (!Object.keys(props).includes("undoIndex") && Object.keys(props).includes("undoStack")) props.undoIndex = props.undoStack.length - 1;
       let newState = Object.assign({}, this.state, props);
       this.syncState(newState);
     };
